@@ -1,0 +1,67 @@
+name: Update Free VLESS (Clash + NekoBox)
+
+on:
+  schedule:
+    - cron: '0 * * * *'  # Каждый час
+  workflow_dispatch:  # Ручной запуск
+
+permissions:
+  contents: write
+
+jobs:
+  convert:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+          token: ${{ github.token }}
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install pyyaml requests
+      
+      - name: Download VLESS configs
+        run: |
+          curl -o vless_lite.txt https://raw.githubusercontent.com/zieng2/wl/refs/heads/main/vless_universal.txt
+          echo "📥 Downloaded vless_lite.txt"
+      
+      - name: Convert to Clash YAML
+        run: |
+          python convert.py
+          echo "✅ Clash YAML created"
+      
+      - name: Convert to NekoBox format
+        run: |
+          python convert_nekobox.py
+          echo "✅ NekoBox subscription created"
+      
+      - name: Commit and push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Добавляем ВСЕ ФАЙЛЫ
+          git add clash_config.yaml nekobox_subscription.txt vless_lite.txt
+          
+          # Проверяем есть ли изменения
+          if git diff --staged --quiet; then
+            echo "✅ No changes to commit"
+            exit 0
+          fi
+          
+          # Коммитим
+          git commit -m "🤖 Auto-update: $(date -u '+%Y-%m-%d %H:%M UTC')"
+          
+          # Пушим
+          git push
+          
+          echo "✅ Successfully updated all files"
